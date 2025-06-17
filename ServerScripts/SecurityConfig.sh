@@ -43,7 +43,7 @@ case $OS in
       *)
         # echo -n "unsupported linux distro"
         ;;
-    esac echo $?
+    esac
   ;;
 
   darwin)
@@ -85,7 +85,7 @@ if [ "$OS" = "Linux" ]; then
       # Debian-based
       log "Detected $DISTRO_ID"
       ;;
-    fedora|rhel|centos)
+    fedora|rhel|centos|almalinux)
       # Red Hat-based
       log "Detected $DISTRO_ID"
       ;;
@@ -101,33 +101,35 @@ fi
 
 # Function to install a package
 install_package() {
-  local package="$1"
+local package="$1"
   log "Installing and attempting to install $package"
 
-    case "$DISTRO_ID" in
-        debian|ubuntu|mint)
-            apt-get update && apt-get install -y "$package"
-            apt_status=$?
-            ;;
-        fedora|rhel|centos)
-            dnf install -y "$package" || yum install -y "$package"
-            dnf_status=$?
-            ;;
-        arch)
-            pacman -Syu --noconfirm "$package"
-            pacman_status=$?
-            ;;
-        *)
-            log "Unsupported Linux distribution for package installation"
-            exit 1
-            ;;
-    esac
-    if [ "$apt_status" -eq 0 ] || [ "$dnf_status" -eq 0 ] || [ "$pacman_status" -eq 0 ]; then
-        log "Package '$package' installed successfully."
-    else
-        log "Failed to install package '$package'."
-        exit 1
-    fi
+  case "$DISTRO_ID" in
+    debian|ubuntu|mint)
+      apt-get update && apt-get install -y "$package"
+      apt_status=$?
+      ;;
+    fedora|rhel|centos|almalinux)
+      dnf install -y "$package" || yum install -y "$package"
+      dnf_status=$?
+      ;;
+    arch)
+      pacman -Syu --noconfirm "$package"
+      pacman_status=$?
+      ;;
+    *)
+      log "Unsupported Linux distribution for package installation"
+      return 1
+      ;;
+  esac
+
+  if [ "$apt_status" -eq 0 ] || [ "$dnf_status" -eq 0 ] || [ "$pacman_status" -eq 0 ]; then
+    log "Package '$package' installed successfully."
+    return 0
+  else
+    log "Failed to install package '$package'."
+    return 1
+  fi
 }
 
 wait
@@ -152,12 +154,22 @@ sed -i 's/^#\?MaxAuthTries.*/MaxAuthTries 3/' "$ssh_config"
 sed -i 's/^#\?AllowTcpForwarding.*/AllowTcpForwarding no/' "$ssh_config"
 
 # Restart SSH service
-systemctl restart ssh || systemctl restart sshd
+if systemctl restart ssh; then
+  log "SSH service restarted successfully."
+elif systemctl restart sshd; then
+  log "SSHd service restarted successfully."
+else
+  log "Failed to restart SSH service."
+fi
 
 log "SSH configuration updated successfully."
 
 # Install security packages
 log "Installing security packages..."
 for package in "${package_name[@]}"; do
-  install_package "$package"
+  if install_package "$package"; then
+    log "Package '$package' installed successfully."
+  else
+    log "Package '$package' failed to install."
+  fi
 done
