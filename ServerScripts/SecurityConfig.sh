@@ -8,24 +8,18 @@ set -e
 # This script will try to make the system more secure
 # If you find this useful, please consider supporting me on github - 0xEALANA
 
-# Function to log messages with timestamp
 log() {
   echo -e "[$(date +"%Y-%m-%d %H:%M:%S")] $1"
 }
 
-# Check if the script is run as root
 if [[ $EUID -ne 0 ]]; then
   log "This script must be run as root" 
   exit 1
 fi
-
-# Determine the operating system
 OS=$(uname -s | tr A-Z a-z)
 
-# Handle different operating systems
 case $OS in
   linux)
-    # Source the os-release file to get distribution information
     source /etc/os-release
     case $ID in
       debian|ubuntu|mint)
@@ -56,20 +50,16 @@ case $OS in
     ;;
 esac
 
-# Determine the Linux distribution ID
 if [ "$OS" = "linux" ] && [ -f /etc/os-release ]; then
-  # Source the os-release file to get variables
   . /etc/os-release
   DISTRO_ID="$ID"
 else
-  # For non-Linux or systems without os-release
   DISTRO_ID="$OS"
 fi
 
 log "Detected OS: $OS"
 log "Detected Distribution ID: $DISTRO_ID"
 
-# Define the list of packages to install
 package_name=(
   "vim"
   "curl"
@@ -78,19 +68,15 @@ package_name=(
   "fail2ban"
 )
 
-# Handle package installation based on the distribution ID
 if [ "$OS" = "Linux" ]; then
   case $DISTRO_ID in
     debian|ubuntu|mint)
-      # Debian-based
       log "Detected $DISTRO_ID"
       ;;
     fedora|rhel|centos|almalinux)
-      # Red Hat-based
       log "Detected $DISTRO_ID"
       ;;
     arch)
-      # Arch-based
       log "Detected $DISTRO_ID"
       ;;
     *)
@@ -99,7 +85,6 @@ if [ "$OS" = "Linux" ]; then
   esac
 fi
 
-# Function to install a package
 install_package() {
 local package="$1"
   log "Installing and attempting to install $package"
@@ -133,12 +118,10 @@ local package="$1"
 }
 
 wait
-
-# Configure SSH
+#Plan to add input to add ssh key from user input, as well, I locked my self out of my server testing
 log "Configuring SSH..."
 ssh_config="/etc/ssh/sshd_config"
 
-# Disable root login
 sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' "$ssh_config"
 
 # Disable password authentication
@@ -153,7 +136,7 @@ sed -i 's/^#\?MaxAuthTries.*/MaxAuthTries 3/' "$ssh_config"
 # Disable TCP forwarding
 sed -i 's/^#\?AllowTcpForwarding.*/AllowTcpForwarding no/' "$ssh_config"
 
-# Restart SSH service
+# Restart SSH service 
 if systemctl restart ssh; then
   log "SSH service restarted successfully."
 elif systemctl restart sshd; then
@@ -164,8 +147,7 @@ fi
 
 log "SSH configuration updated successfully."
 
-# Install security packages
-log "Installing security packages..."
+log "Installing packages..."
 for package in "${package_name[@]}"; do
   if install_package "$package"; then
     log "Package '$package' installed successfully."
