@@ -1,3 +1,5 @@
 /.vscode
 /aaa.md
 /index.html
+.env
+/.env 
